@@ -665,7 +665,8 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 
 <script>
 const BOOSTA_LABELS = {B:'Blocking',O1:'Over-stuffing',O2:'Overhanging',S:'Same/Similar',T:'Type of Bin',A:'Above divider',OTHERS:'Others'};
-const MANAGER_PIN = "8888"; // Change this to your preferred security code
+const MANAGER_PIN = "8888"; // Pin for resolving
+const DELETE_PIN = "9999"; // Pin for deleting
 const URG_LABELS = ['','Minor','Moderate','Serious','Critical','Critical'];
 const URG_EMOJIS = ['','🟡','🟠','🔴','🆘','🆘'];
 let selectedUrgency = 1;
@@ -895,10 +896,15 @@ function renderBins() {
     });
   }
 
+  function parseUTC(ts) {
+    if (!ts.endsWith('Z') && !ts.includes('+')) return new Date(ts + 'Z');
+    return new Date(ts);
+  }
+
   // 2. Time Sorting
   filtered.sort((a, b) => {
-    const timeA = new Date(a.timestamp).getTime();
-    const timeB = new Date(b.timestamp).getTime();
+    const timeA = parseUTC(a.timestamp).getTime();
+    const timeB = parseUTC(b.timestamp).getTime();
     return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
   });
 
@@ -908,7 +914,7 @@ function renderBins() {
   
   currentBinsData.forEach(b => {
     if (b.status === 'resolved') return;
-    const diffHours = (now - new Date(b.timestamp).getTime()) / (1000 * 60 * 60);
+    const diffHours = (now - parseUTC(b.timestamp).getTime()) / (1000 * 60 * 60);
     if (diffHours >= 24) aging.h24++;
     else if (diffHours >= 12) aging.h12++;
     else if (diffHours >= 6) aging.h6++;
@@ -919,11 +925,11 @@ function renderBins() {
   const agingBar = document.getElementById('aging-bar');
   if (aging.h0 + aging.h3 + aging.h6 + aging.h12 + aging.h24 > 0) {
     agingBar.innerHTML = `
-      ${aging.h24 ? `<div class="age-badge age-24h">🆘 ${aging.h24} Overdue (>24h)</div>` : ''}
-      ${aging.h12 ? `<div class="age-badge age-12h">🚨 ${aging.h12} Serious (>12h)</div>` : ''}
-      ${aging.h6 ? `<div class="age-badge age-6h">🕒 ${aging.h6} Warning (>6h)</div>` : ''}
-      ${aging.h3 ? `<div class="age-badge age-3h">⌛ ${aging.h3} Pending (>3h)</div>` : ''}
-      ${aging.h0 ? `<div class="age-badge age-0h">✅ ${aging.h0} Recent (<3h)</div>` : ''}
+      ${aging.h24 ? `<div class="age-badge age-24h">🆘 ${aging.h24} Overdue (>24hr)</div>` : ''}
+      ${aging.h12 ? `<div class="age-badge age-12h">🚨 ${aging.h12} Serious (>12hr)</div>` : ''}
+      ${aging.h6 ? `<div class="age-badge age-6h">🕒 ${aging.h6} Warning (>6hr)</div>` : ''}
+      ${aging.h3 ? `<div class="age-badge age-3h">⌛ ${aging.h3} Pending (>3hr)</div>` : ''}
+      ${aging.h0 ? `<div class="age-badge age-0h">✅ ${aging.h0} Recent (<3hr)</div>` : ''}
     `;
   } else {
     agingBar.innerHTML = `<div class="age-badge" style="border-color:var(--muted); color:var(--muted); opacity:0.5">No pending issues</div>`;
@@ -937,7 +943,9 @@ function renderBins() {
 }
 
 function timeAgo(date) {
-  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  let d = date;
+  if (!d.endsWith('Z') && !d.includes('+')) d = d + 'Z';
+  const seconds = Math.floor((new Date() - new Date(d)) / 1000);
   if (seconds < 60) return 'Just now';
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return minutes + 'm ago';
@@ -1001,7 +1009,7 @@ async function deleteRecord(id) {
   const pin = prompt('🚨 SECURITY ALERT\nEnter PIN to permanently DELETE this report:');
   if (pin === null) return;
   
-  if (pin !== MANAGER_PIN) {
+  if (pin !== DELETE_PIN) {
     toast('❌ Invalid PIN. Delete cancelled.');
     return;
   }

@@ -7,7 +7,7 @@ import os
 import json
 import uuid
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -86,7 +86,7 @@ init_db()
 
 @app.route("/")
 def index():
-    return send_from_directory("public", "index.html")
+    return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/uploads/<path:filename>")
@@ -190,7 +190,7 @@ def submit_bin():
         "boosta_categories": boosta_categories,
         "image_path": image_path,
         "image_url": image_url,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "open",  # open | resolved
     }
 

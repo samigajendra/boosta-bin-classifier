@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>BOOSTA Bin Classifier | Amazon FC</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- Embed Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -170,6 +172,32 @@ nav {
   letter-spacing: 0.05em;
 }
 
+/* CHARTS SECTION */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  position: relative;
+}
+
+.chart-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* FORM */
 .form-card {
   background: var(--card);
@@ -255,9 +283,7 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 .drop-label { font-weight: 700; font-size: 1.1rem; color: var(--text); }
 .drop-sub { font-size: 0.85rem; color: var(--muted); margin-top: 6px; }
 
-#preview-wrap { margin-top: 20px; animation: scaleIn 0.3s ease-out; }
 @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-#preview-wrap img { width: 100%; max-height: 400px; object-fit: contain; border-radius: 12px; border: 1px solid var(--border); }
 
 /* BOOSTA CHECKBOXES */
 .boosta-grid {
@@ -642,11 +668,29 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   
   <div class="aging-bar" id="aging-bar"></div>
 
+  <!-- INTERACTIVE CHARTS SECTION -->
+  <div class="chart-card" style="max-width:680px; margin:0 auto 40px auto;">
+    <div class="chart-title" style="justify-content:center; font-size:1.2rem;">🔤 BOOSTA Violations Breakdown</div>
+    <div style="position:relative; height:300px; width:100%;">
+      <canvas id="boostaChart"></canvas>
+    </div>
+  </div>
+
   <div class="dash-controls">
     <span class="dash-title">📊 All Bin Reports</span>
     <select id="sort-order" class="sort-select" onchange="applySort()">
       <option value="desc">Newest First</option>
       <option value="asc">Oldest First</option>
+    </select>
+    <select id="boosta-filter" class="sort-select" onchange="applySort()" style="border-color:var(--accent);">
+      <option value="all">🔤 All Violations</option>
+      <option value="B">Blocking (B)</option>
+      <option value="O1">Over-stuffing (O)</option>
+      <option value="O2">Overhanging (O)</option>
+      <option value="S">Same/Similar (S)</option>
+      <option value="T">Type of Bin (T)</option>
+      <option value="A">Above divider (A)</option>
+      <option value="OTHERS">Others (*)</option>
     </select>
     <input type="text" id="search-input" placeholder="🔍 Search Bin ID, Aisle, or Associate..." oninput="applySearch()" style="flex:1; min-width:250px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 16px; color:var(--text); font-family:'Inter',sans-serif;"/>
     <button class="filter-btn active" onclick="filterDash('all',this)">All</button>
@@ -674,6 +718,14 @@ let selectedBoosta = [];
 let currentFilter = 'all';
 let compressedImageBlob = null; // Variable to store our resized photo
 let currentBinsData = []; // Store fetched bins for local searching
+
+let boostaChartInstance = null;
+
+// Configure Global Chart.js Themes for Dark Mode aesthetics
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color = 'hsl(215, 25%, 75%)';
+  Chart.defaults.borderColor = 'hsl(222, 30%, 20%)';
+}
 
 // Init
 setUrgency(1);
@@ -747,7 +799,21 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
-  event.currentTarget.classList.add('active');
+  
+  try {
+    if (typeof event !== 'undefined' && event && event.currentTarget) {
+      event.currentTarget.classList.add('active');
+    } else {
+      const tabs = document.querySelectorAll('.nav-tab');
+      if (name === 'submit') tabs[0].classList.add('active');
+      if (name === 'dashboard') tabs[1].classList.add('active');
+    }
+  } catch(e) {
+    const tabs = document.querySelectorAll('.nav-tab');
+    if (name === 'submit') tabs[0].classList.add('active');
+    if (name === 'dashboard') tabs[1].classList.add('active');
+  }
+
   if (name === 'dashboard') { loadStats(); loadBins(); }
 }
 
@@ -879,10 +945,69 @@ function applySort() {
   renderBins();
 }
 
+function renderCharts(filteredBins) {
+  try {
+    if (typeof Chart === 'undefined') return;
+
+    // Calculate BOOSTA Category Breakdown
+    const boostaCounts = { B:0, O1:0, O2:0, S:0, T:0, A:0, OTHERS:0 };
+    filteredBins.forEach(b => {
+      const cats = b.boosta_categories || [];
+      if (!cats.length) return;
+      cats.forEach(c => {
+        if (boostaCounts[c] !== undefined) boostaCounts[c]++;
+        else boostaCounts.OTHERS++;
+      });
+    });
+
+    const boostaLabels = ['Blocking (B)', 'Over-stuffing (O)', 'Overhanging (O)', 'Same/Similar (S)', 'Type of Bin (T)', 'Above divider (A)', 'Others'];
+    const boostaData = [boostaCounts.B, boostaCounts.O1, boostaCounts.O2, boostaCounts.S, boostaCounts.T, boostaCounts.A, boostaCounts.OTHERS];
+    const boostaColors = ['#f59e0b', '#ec4899', '#f43f5e', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280'];
+
+    // Update BOOSTA Doughnut Chart
+    const ctxBoosta = document.getElementById('boostaChart').getContext('2d');
+    if (boostaChartInstance) {
+      boostaChartInstance.data.datasets[0].data = boostaData;
+      boostaChartInstance.update();
+    } else {
+      boostaChartInstance = new Chart(ctxBoosta, {
+        type: 'doughnut',
+        data: {
+          labels: boostaLabels,
+          datasets: [{
+            data: boostaData,
+            backgroundColor: boostaColors,
+            borderWidth: 2,
+            borderColor: 'hsl(222, 47%, 15%)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { 
+              position: 'right', 
+              labels: { 
+                boxWidth: 20, 
+                padding: 16,
+                font: { size: 14, weight: 'bold' },
+                color: 'hsl(214, 32%, 96%)'
+              } 
+            }
+          }
+        }
+      });
+    }
+  } catch(e) {
+    console.error("Chart Rendering Error:", e);
+  }
+}
+
 function renderBins() {
   const grid = document.getElementById('bins-grid');
   const term = document.getElementById('search-input').value.toLowerCase().trim();
   const sortOrder = document.getElementById('sort-order').value;
+  const boostaCat = document.getElementById('boosta-filter') ? document.getElementById('boosta-filter').value : 'all';
   
   let filtered = [...currentBinsData]; // Use spread to avoid mutating original data
 
@@ -895,6 +1020,17 @@ function renderBins() {
       return idStr.includes(term) || aisleStr.includes(term) || repStr.includes(term);
     });
   }
+
+  // 2. BOOSTA Category Filter
+  if (boostaCat && boostaCat !== 'all') {
+    filtered = filtered.filter(b => {
+      const cats = b.boosta_categories || [];
+      return cats.includes(boostaCat);
+    });
+  }
+
+  // Render Charts dynamically based on currently viewed list!
+  renderCharts(filtered);
 
   function parseUTC(ts) {
     if (!ts.endsWith('Z') && !ts.includes('+')) return new Date(ts + 'Z');

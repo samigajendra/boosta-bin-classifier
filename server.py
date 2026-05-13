@@ -7,6 +7,7 @@ import os
 import json
 import uuid
 import sqlite3
+import urllib.parse
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from werkzeug.utils import secure_filename
@@ -22,6 +23,15 @@ try:
 except ImportError:
     cloudinary = None
     HAS_CLOUDINARY = False
+
+# PostgreSQL Support (Optional for Cloud Deployment)
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    HAS_POSTGRES = True
+except ImportError:
+    psycopg2 = None
+    HAS_POSTGRES = False
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 
@@ -49,18 +59,49 @@ if HAS_CLOUDINARY and os.environ.get("CLOUDINARY_CLOUD_NAME"):
 else:
     print("  [Local] Using local folder for image storage.")
 
-# ── Helpers ──────────────────────────────────────────────────────────────
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+# ── Database Helpers ──────────────────────────────────────────────────────
+DB_URL = os.environ.get("DATABASE_URL")
+if DB_URL and DB_URL.startswith("postgres://"):
+    DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_FILE, timeout=10)
-    conn.row_factory = sqlite3.Row
-    return conn
+def execute_query(query, params=(), commit=False, fetchone=False, fetchall=False):
+    """
+    Executes a query safely against either PostgreSQL (if DATABASE_URL is set) 
+    or local SQLite as a fallback.
+    """
+    is_postgres = bool(DB_URL and HAS_POSTGRES)
+    
+    if is_postgres:
+        # PostgreSQL uses %s for parameter substitution
+        pg_query = query.replace('?', '%s')
+        conn = psycopg2.connect(DB_URL)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        # SQLite
+        conn = sqlite3.connect(DB_FILE, timeout=10)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        pg_query = query
+
+    try:
+        cursor.execute(pg_query, params)
+        if commit:
+            conn.commit()
+        
+        if fetchone:
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        if fetchall:
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+            
+        return cursor.rowcount
+    finally:
+        cursor.close()
+        conn.close()
 
 def init_db():
-    conn = get_db_connection()
-    conn.execute('''
+    query = '''
         CREATE TABLE IF NOT EXISTS bins (
             id TEXT PRIMARY KEY,
             bin_id TEXT,
@@ -74,9 +115,8 @@ def init_db():
             timestamp TEXT,
             status TEXT
         )
-    ''')
-    conn.commit()
-    conn.close()
+    '''
+    execute_query(query, commit=True)
 
 # Initialize DB on startup
 init_db()
@@ -100,7 +140,6 @@ def get_bins():
     urgency = request.args.get("urgency")
     category = request.args.get("category")
 
-    conn = get_db_connection()
     query = "SELECT * FROM bins"
     params = []
     
@@ -117,12 +156,10 @@ def get_bins():
         
     query += " ORDER BY urgency DESC, timestamp DESC"
     
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
+    rows = execute_query(query, params, fetchall=True)
 
     data = []
-    for row in rows:
-        b = dict(row)
+    for b in rows:
         try:
             b["boosta_categories"] = json.loads(b["boosta_categories"])
         except:
@@ -194,17 +231,16 @@ def submit_bin():
         "status": "open",  # open | resolved
     }
 
-    conn = get_db_connection()
-    conn.execute('''
+    query = '''
         INSERT INTO bins (id, bin_id, aisle, reported_by, description, urgency, boosta_categories, image_path, image_url, timestamp, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
+    '''
+    params = (
         record["id"], record["bin_id"], record["aisle"], record["reported_by"],
         record["description"], record["urgency"], json.dumps(record["boosta_categories"]),
         record["image_path"], record["image_url"], record["timestamp"], record["status"]
-    ))
-    conn.commit()
-    conn.close()
+    )
+    execute_query(query, params, commit=True)
 
     return jsonify({"success": True, "record": record}), 201
 
@@ -212,22 +248,21 @@ def submit_bin():
 @app.route("/api/bins/<bin_record_id>", methods=["DELETE"])
 def delete_bin(bin_record_id):
     """Delete a submission by its UUID."""
-    conn = get_db_connection()
-    row = conn.execute("SELECT image_path FROM bins WHERE id = ?", (bin_record_id,)).fetchone()
+    row = execute_query("SELECT image_path FROM bins WHERE id = ?", (bin_record_id,), fetchone=True)
 
     if not row:
-        conn.close()
         return jsonify({"success": False, "error": "Record not found"}), 404
 
     # Delete image file if exists
-    if row["image_path"]:
+    if row.get("image_path"):
         img_file = os.path.join(UPLOAD_FOLDER, row["image_path"])
         if os.path.exists(img_file):
-            os.remove(img_file)
+            try:
+                os.remove(img_file)
+            except Exception as e:
+                print(f"Error removing file {img_file}: {e}")
 
-    conn.execute("DELETE FROM bins WHERE id = ?", (bin_record_id,))
-    conn.commit()
-    conn.close()
+    execute_query("DELETE FROM bins WHERE id = ?", (bin_record_id,), commit=True)
 
     return jsonify({"success": True, "deleted": bin_record_id})
 
@@ -235,22 +270,16 @@ def delete_bin(bin_record_id):
 @app.route("/api/bins/<bin_record_id>/resolve", methods=["PATCH"])
 def resolve_bin(bin_record_id):
     """Toggle a bin's status between open and resolved."""
-    conn = get_db_connection()
-    row = conn.execute("SELECT status FROM bins WHERE id = ?", (bin_record_id,)).fetchone()
+    row = execute_query("SELECT status FROM bins WHERE id = ?", (bin_record_id,), fetchone=True)
 
     if not row:
-        conn.close()
         return jsonify({"success": False, "error": "Record not found"}), 404
 
     new_status = "resolved" if row["status"] == "open" else "open"
-    conn.execute("UPDATE bins SET status = ? WHERE id = ?", (new_status, bin_record_id))
-    conn.commit()
+    execute_query("UPDATE bins SET status = ? WHERE id = ?", (new_status, bin_record_id), commit=True)
 
     # Fetch updated record
-    updated_row = conn.execute("SELECT * FROM bins WHERE id = ?", (bin_record_id,)).fetchone()
-    conn.close()
-
-    record = dict(updated_row)
+    record = execute_query("SELECT * FROM bins WHERE id = ?", (bin_record_id,), fetchone=True)
     try:
         record["boosta_categories"] = json.loads(record["boosta_categories"])
     except:
@@ -262,29 +291,31 @@ def resolve_bin(bin_record_id):
 @app.route("/api/stats", methods=["GET"])
 def get_stats():
     """Return summary statistics."""
-    conn = get_db_connection()
+    # We use a single tuple with one value instead of just indexing to handle different db returns safely
+    total_row = execute_query("SELECT COUNT(*) as count FROM bins", fetchone=True)
+    total = total_row["count"] if total_row else 0
     
-    total = conn.execute("SELECT COUNT(*) FROM bins").fetchone()[0]
-    open_count = conn.execute("SELECT COUNT(*) FROM bins WHERE status = 'open'").fetchone()[0]
-    resolved_count = conn.execute("SELECT COUNT(*) FROM bins WHERE status = 'resolved'").fetchone()[0]
+    open_row = execute_query("SELECT COUNT(*) as count FROM bins WHERE status = 'open'", fetchone=True)
+    open_count = open_row["count"] if open_row else 0
     
-    urgency_rows = conn.execute("SELECT urgency, COUNT(*) FROM bins GROUP BY urgency").fetchall()
+    resolved_row = execute_query("SELECT COUNT(*) as count FROM bins WHERE status = 'resolved'", fetchone=True)
+    resolved_count = resolved_row["count"] if resolved_row else 0
+    
+    urgency_rows = execute_query("SELECT urgency, COUNT(*) as count FROM bins GROUP BY urgency", fetchall=True)
     urgency_counts = {str(i): 0 for i in range(1, 6)}
     for r in urgency_rows:
-        urgency_counts[str(r[0])] = r[1]
+        urgency_counts[str(r["urgency"])] = r["count"]
         
     category_counts = {"B": 0, "O1": 0, "O2": 0, "S": 0, "T": 0, "A": 0}
-    boosta_rows = conn.execute("SELECT boosta_categories FROM bins").fetchall()
+    boosta_rows = execute_query("SELECT boosta_categories FROM bins", fetchall=True)
     for r in boosta_rows:
         try:
-            cats = json.loads(r[0])
+            cats = json.loads(r["boosta_categories"])
             for cat in cats:
                 if cat in category_counts:
                     category_counts[cat] += 1
         except:
             pass
-            
-    conn.close()
 
     return jsonify({
         "success": True,

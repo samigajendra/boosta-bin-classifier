@@ -59,8 +59,11 @@ if HAS_CLOUDINARY and os.environ.get("CLOUDINARY_CLOUD_NAME"):
 else:
     print("  [Local] Using local folder for image storage.")
 
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # ── Database Helpers ──────────────────────────────────────────────────────
-DB_URL = os.environ.get("DATABASE_URL")
+DB_URL = os.environ.get("DATABASE_URL", "").strip()
 if DB_URL and DB_URL.startswith("postgres://"):
     DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
 

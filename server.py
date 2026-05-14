@@ -141,6 +141,18 @@ def init_db():
         )
     '''
     execute_query(query, commit=True)
+    
+    # Safely add resolved_by column if it doesn't exist
+    try:
+        execute_query("ALTER TABLE bins ADD COLUMN resolved_by TEXT", commit=True)
+    except Exception:
+        pass
+
+    # Safely add resolved_at column if it doesn't exist
+    try:
+        execute_query("ALTER TABLE bins ADD COLUMN resolved_at TEXT", commit=True)
+    except Exception:
+        pass
 
 # Initialize DB on startup
 init_db()
@@ -233,6 +245,7 @@ def submit_bin():
             
             # Option 2: Local Storage (Fallback)
             if not image_url:
+                file.seek(0)  # Reset stream pointer in case Cloudinary attempt exhausted it
                 ext = file.filename.rsplit(".", 1)[1].lower()
                 unique_name = f"{uuid.uuid4().hex}.{ext}"
                 save_path = os.path.join(UPLOAD_FOLDER, unique_name)
@@ -294,13 +307,21 @@ def delete_bin(bin_record_id):
 @app.route("/api/bins/<bin_record_id>/resolve", methods=["PATCH"])
 def resolve_bin(bin_record_id):
     """Toggle a bin's status between open and resolved."""
+    data = request.get_json(silent=True) or {}
+    resolved_by = data.get("resolved_by", "").strip()
+
     row = execute_query("SELECT status FROM bins WHERE id = ?", (bin_record_id,), fetchone=True)
 
     if not row:
         return jsonify({"success": False, "error": "Record not found"}), 404
 
     new_status = "resolved" if row["status"] == "open" else "open"
-    execute_query("UPDATE bins SET status = ? WHERE id = ?", (new_status, bin_record_id), commit=True)
+    resolved_at = datetime.now(timezone.utc).isoformat() if new_status == "resolved" else None
+    
+    if new_status == "open":
+        resolved_by = None
+        
+    execute_query("UPDATE bins SET status = ?, resolved_by = ?, resolved_at = ? WHERE id = ?", (new_status, resolved_by, resolved_at, bin_record_id), commit=True)
 
     # Fetch updated record
     record = execute_query("SELECT * FROM bins WHERE id = ?", (bin_record_id,), fetchone=True)

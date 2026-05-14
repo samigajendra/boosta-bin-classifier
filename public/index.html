@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- Embed Chart.js library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Embed html5-qrcode for barcode scanning -->
+<script src="https://unpkg.com/html5-qrcode"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -585,7 +587,14 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
     <div class="row2">
       <div class="form-group">
         <label>Bin ID (optional)</label>
-        <input type="text" id="bin_id" placeholder="e.g. A-12-3"/>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="bin_id" placeholder="e.g. A-12-3" style="flex: 1;"/>
+          <button type="button" id="scan-btn" onclick="startScanner()" style="padding: 0 16px; border-radius: 12px; background: var(--surface); border: 2px solid var(--border); color: var(--text); cursor: pointer; font-weight: 700; transition: var(--transition);">📷 Scan</button>
+        </div>
+        <div id="reader-container" style="display: none; margin-top: 10px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; background: #000;">
+          <div id="reader" style="width: 100%;"></div>
+          <button type="button" onclick="stopScanner()" style="width: 100%; padding: 12px; background: var(--card); color: var(--u4); border: none; font-weight: bold; cursor: pointer; border-top: 1px solid var(--border);">Cancel Scan</button>
+        </div>
       </div>
       <div class="form-group">
         <label>Aisle / Zone</label>
@@ -729,6 +738,47 @@ if (typeof Chart !== 'undefined') {
 
 // Init
 setUrgency(1);
+
+// Barcode Scanner
+let html5QrcodeScanner = null;
+
+function startScanner() {
+  document.getElementById('reader-container').style.display = 'block';
+  if (!html5QrcodeScanner) {
+    html5QrcodeScanner = new Html5Qrcode("reader");
+  }
+  const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+  html5QrcodeScanner.start(
+    { facingMode: "environment" },
+    config,
+    (decodedText, decodedResult) => {
+      // success
+      document.getElementById('bin_id').value = decodedText;
+      stopScanner();
+      toast('✅ Barcode scanned successfully!');
+    },
+    (errorMessage) => {
+      // parse error, ignore
+    }
+  ).catch((err) => {
+    console.error(err);
+    toast('❌ Camera access denied or error starting scanner.');
+    stopScanner();
+  });
+}
+
+function stopScanner() {
+  if (html5QrcodeScanner) {
+    html5QrcodeScanner.stop().then((ignore) => {
+      document.getElementById('reader-container').style.display = 'none';
+    }).catch((err) => {
+      console.error(err);
+      document.getElementById('reader-container').style.display = 'none';
+    });
+  } else {
+    document.getElementById('reader-container').style.display = 'none';
+  }
+}
 
 // Drag & Drop
 const dz = document.getElementById('drop-zone');

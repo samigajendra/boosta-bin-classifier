@@ -29,9 +29,10 @@ try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
     HAS_POSTGRES = True
-except ImportError:
+except ImportError as e:
     psycopg2 = None
     HAS_POSTGRES = False
+    print(f"  [Database Driver Error] psycopg2 import failed: {e}")
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 
@@ -72,6 +73,11 @@ def allowed_file(filename):
 DB_URL = os.environ.get("DATABASE_URL", "").strip()
 if DB_URL and DB_URL.startswith("postgres://"):
     DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
+
+if DB_URL:
+    print("  [Database Config] DATABASE_URL environment variable successfully detected.")
+else:
+    print("  [Database Config] Warning: DATABASE_URL environment variable is MISSING or empty.")
 
 if DB_URL and HAS_POSTGRES:
     print("  [Database Engine] PostgreSQL persistent database ENABLED.")

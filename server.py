@@ -48,16 +48,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ── Cloudinary Config ──────────────────────────────────────────────────
 # These should be set as Environment Variables on your cloud provider
-if HAS_CLOUDINARY and os.environ.get("CLOUDINARY_CLOUD_NAME"):
-    cloudinary.config(
-        cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
-        api_key=os.environ.get("CLOUDINARY_API_KEY"),
-        api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
-        secure=True
-    )
-    print("  [Cloud] Cloudinary configured for image storage.")
+has_cloudinary_keys = bool(os.environ.get("CLOUDINARY_CLOUD_NAME") or os.environ.get("CLOUDINARY_URL"))
+
+if HAS_CLOUDINARY and has_cloudinary_keys:
+    cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME", "").strip()
+    api_key = os.environ.get("CLOUDINARY_API_KEY", "").strip()
+    api_secret = os.environ.get("CLOUDINARY_API_SECRET", "").strip()
+    if cloud_name:
+        cloudinary.config(
+            cloud_name=cloud_name,
+            api_key=api_key,
+            api_secret=api_secret,
+            secure=True
+        )
+    print("  [Storage Engine] Cloudinary persistent hosting ENABLED.")
 else:
-    print("  [Local] Using local folder for image storage.")
+    print("  [Storage Engine] Local upload folder (EPHEMERAL on Render Free).")
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -66,6 +72,11 @@ def allowed_file(filename):
 DB_URL = os.environ.get("DATABASE_URL", "").strip()
 if DB_URL and DB_URL.startswith("postgres://"):
     DB_URL = DB_URL.replace("postgres://", "postgresql://", 1)
+
+if DB_URL and HAS_POSTGRES:
+    print("  [Database Engine] PostgreSQL persistent database ENABLED.")
+else:
+    print("  [Database Engine] Local SQLite database (EPHEMERAL on Render Free).")
 
 def execute_query(query, params=(), commit=False, fetchone=False, fetchall=False):
     """
@@ -77,7 +88,11 @@ def execute_query(query, params=(), commit=False, fetchone=False, fetchall=False
     if is_postgres:
         # PostgreSQL uses %s for parameter substitution
         pg_query = query.replace('?', '%s')
-        conn = psycopg2.connect(DB_URL)
+        # Ensure secure connection for external/cloud databases
+        connect_kwargs = {}
+        if "localhost" not in DB_URL and "127.0.0.1" not in DB_URL and "sslmode" not in DB_URL:
+            connect_kwargs["sslmode"] = "require"
+        conn = psycopg2.connect(DB_URL, **connect_kwargs)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
     else:
         # SQLite
@@ -203,7 +218,7 @@ def submit_bin():
         file = request.files["image"]
         if file and file.filename and allowed_file(file.filename):
             # Option 1: Cloudinary (If keys are provided)
-            if HAS_CLOUDINARY and os.environ.get("CLOUDINARY_CLOUD_NAME"):
+            if HAS_CLOUDINARY and has_cloudinary_keys:
                 try:
                     upload_result = cloudinary.uploader.upload(file)
                     image_url = upload_result.get("secure_url")

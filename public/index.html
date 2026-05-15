@@ -272,6 +272,13 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   background: hsla(38, 100%, 50%, 0.03);
 }
 
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: hsla(38, 100%, 50%, 0.1);
+  transform: scale(1.02);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
 .drop-zone input[type="file"] {
   position: absolute;
   inset: 0;
@@ -564,6 +571,115 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 
 .sort-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 .sort-select:focus { outline: none; border-color: var(--accent); }
+
+/* HEATMAP STYLES */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.aisle-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  transition: var(--transition);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.aisle-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.aisle-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.aisle-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.heat-level {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 6px;
+  width: 100%;
+}
+
+.heat-low { background: var(--u1); box-shadow: 0 0 15px var(--u1); }
+.heat-mid { background: var(--u2); box-shadow: 0 0 15px var(--u2); }
+.heat-high { background: var(--u3); box-shadow: 0 0 15px var(--u3); }
+.heat-critical { background: var(--u4); box-shadow: 0 0 20px var(--u4); animation: heatPulse 1.5s infinite; }
+
+@keyframes heatPulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* FULL SCREEN IMAGE OVERLAY */
+.image-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  animation: overlayFadeIn 0.3s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.image-overlay img {
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
+}
+
+.image-overlay:hover img {
+  transform: scale(1.02);
+}
+
+.close-overlay {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: #fff;
+  font-size: 40px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 2001;
+  transition: 0.3s;
+}
+
+.close-overlay:hover {
+  color: var(--accent);
+  transform: scale(1.2);
+}
 </style>
 </head>
 <body>
@@ -576,6 +692,7 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showView('submit')">📋 Report Bin</button>
     <button class="nav-tab" onclick="showView('dashboard')">📊 Dashboard</button>
+    <button class="nav-tab" onclick="showView('heatmap')">🗺️ Heatmap</button>
     <button class="nav-tab" onclick="showView('resolved')">✅ Resolved section</button>
   </div>
 </nav>
@@ -623,10 +740,12 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
         </label>
       </div>
       <div class="drop-zone" id="drop-zone" style="padding: 24px;">
+        <input type="file" accept="image/*" onchange="handleFile(this.files[0])" style="position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;"/>
         <div class="drop-label">Or drag & drop photo here</div>
+        <div class="drop-sub">Click to browse files</div>
       </div>
       <div id="preview-wrap" style="margin-top: 16px; display: none;">
-        <img id="preview-img" style="width: 100%; border-radius: 12px; object-fit: cover;" src="" alt="preview"/>
+        <img id="preview-img" style="width: 100%; border-radius: 12px; object-fit: cover; cursor: zoom-in;" src="" alt="preview" onclick="openFullScreen(this.src)"/>
       </div>
     </div>
 
@@ -737,6 +856,14 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
     <span class="dash-title" style="color: var(--u1); font-size: 1.4rem;">✅ Resolved Issues Archive</span>
   </div>
   <div class="bins-grid" id="resolved-grid"></div>
+</div>
+
+<!-- HEATMAP VIEW -->
+<div class="view" id="view-heatmap">
+  <div class="dash-controls" style="justify-content: center; margin-bottom: 20px;">
+    <span class="dash-title">🗺️ Warehouse Aisle Heatmap</span>
+  </div>
+  <div class="heatmap-grid" id="heatmap-grid"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -949,13 +1076,14 @@ function showView(name) {
   if (targetView) targetView.classList.add('active');
   
   const tabs = document.querySelectorAll('.nav-tab');
-  if (tabs.length >= 3) {
+  if (tabs.length >= 4) {
     if (name === 'submit') tabs[0].classList.add('active');
     if (name === 'dashboard') tabs[1].classList.add('active');
-    if (name === 'resolved') tabs[2].classList.add('active');
+    if (name === 'heatmap') tabs[2].classList.add('active');
+    if (name === 'resolved') tabs[3].classList.add('active');
   }
 
-  if (name === 'dashboard' || name === 'resolved') { loadStats(); loadBins(); }
+  if (name === 'dashboard' || name === 'resolved' || name === 'heatmap') { loadStats(); loadBins(); }
 }
 
 function toast(msg, dur=3000) {
@@ -1074,6 +1202,7 @@ async function loadBins(urgency='') {
     currentBinsData = bins; // Store for local search
     renderBins();
     renderResolvedBins();
+    renderHeatmap();
   } catch(e) { 
     console.error('Bins load error:', e);
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Could not load data. Is the server running?</div></div>'; 
@@ -1236,7 +1365,7 @@ function timeAgo(date) {
 function binCard(b) {
   const u = b.urgency;
   const imgHtml = b.image_url
-    ? `<div class="bin-img"><img src="${b.image_url}" alt="bin"/></div>`
+    ? `<div class="bin-img" onclick="openFullScreen('${b.image_url}')" style="cursor: zoom-in;"><img src="${b.image_url}" alt="bin"/></div>`
     : `<div class="bin-img" style="height:80px;font-size:2rem">📦</div>`;
   const tags = (b.boosta_categories||[]).map(c=>`<span class="b-tag">${c}: ${BOOSTA_LABELS[c]||c}</span>`).join('');
   const ts = timeAgo(b.timestamp);
@@ -1275,7 +1404,7 @@ function formatExactTime(ts) {
 
 function resolvedCard(b) {
   const imgHtml = b.image_url
-    ? `<div class="bin-img" style="height:180px;"><img src="${b.image_url}" alt="bin"/></div>`
+    ? `<div class="bin-img" onclick="openFullScreen('${b.image_url}')" style="height:180px; cursor: zoom-in;"><img src="${b.image_url}" alt="bin"/></div>`
     : `<div class="bin-img" style="height:100px;font-size:2rem">📦</div>`;
   const raisedTime = formatExactTime(b.timestamp);
   const resolvedTime = formatExactTime(b.resolved_at || b.timestamp);
@@ -1343,6 +1472,7 @@ async function resolveRecord(id, currentStatus) {
   toast('✅ Status updated');
   loadBins(currentFilter);
   loadStats();
+  renderHeatmap();
 }
 
 async function deleteRecord(id) {
@@ -1359,7 +1489,79 @@ async function deleteRecord(id) {
   toast('🗑️ Report deleted');
   loadBins(currentFilter);
   loadStats();
+  renderHeatmap();
+}
+
+function renderHeatmap() {
+  const grid = document.getElementById('heatmap-grid');
+  if (!grid) return;
+
+  const aisleStats = {};
+  currentBinsData.forEach(b => {
+    if (b.status === 'resolved') return;
+    const aisle = (b.aisle || 'Unknown').trim();
+    if (!aisleStats[aisle]) {
+      aisleStats[aisle] = { count: 0, maxUrgency: 0 };
+    }
+    aisleStats[aisle].count++;
+    aisleStats[aisle].maxUrgency = Math.max(aisleStats[aisle].maxUrgency, b.urgency || 1);
+  });
+
+  const aisles = Object.keys(aisleStats).sort();
+
+  if (aisles.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><div>No active violations to map. Warehouse is clear!</div></div>';
+    return;
+  }
+
+  grid.innerHTML = aisles.map(name => {
+    const stat = aisleStats[name];
+    let heatClass = 'heat-low';
+    if (stat.count >= 5 || stat.maxUrgency >= 4) heatClass = 'heat-critical';
+    else if (stat.count >= 3 || stat.maxUrgency >= 3) heatClass = 'heat-high';
+    else if (stat.count >= 2 || stat.maxUrgency >= 2) heatClass = 'heat-mid';
+
+    return `
+      <div class="aisle-card" onclick="filterByAisle('${name}')">
+        <div class="aisle-name">${name}</div>
+        <div class="aisle-count">${stat.count} Open Issue${stat.count > 1 ? 's' : ''}</div>
+        <div class="heat-level ${heatClass}"></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterByAisle(aisleName) {
+  showView('dashboard');
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.value = aisleName;
+    applySearch();
+  }
+  toast(`🔍 Filtering dashboard for ${aisleName}`);
+}
+
+function openFullScreen(url) {
+  if (!url) return;
+  const overlay = document.getElementById('image-overlay');
+  const img = document.getElementById('overlay-img');
+  img.src = url;
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden'; // Prevent scrolling
+}
+
+function closeFullScreen() {
+  const overlay = document.getElementById('image-overlay');
+  overlay.style.display = 'none';
+  document.body.style.overflow = 'auto'; // Restore scrolling
 }
 </script>
+
+<!-- FULL SCREEN OVERLAY -->
+<div id="image-overlay" class="image-overlay" onclick="closeFullScreen()">
+  <span class="close-overlay">&times;</span>
+  <img id="overlay-img" src="" alt="Full Screen Preview">
+</div>
+
 </body>
 </html>

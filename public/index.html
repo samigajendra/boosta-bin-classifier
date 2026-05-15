@@ -906,6 +906,7 @@ function startScanner() {
     (decodedText, decodedResult) => {
       // success
       document.getElementById('bin_id').value = decodedText;
+      autoFillAisle(decodedText);
       stopScanner();
       toast('✅ Barcode scanned successfully!');
     },
@@ -1555,6 +1556,27 @@ function closeFullScreen() {
   overlay.style.display = 'none';
   document.body.style.overflow = 'auto'; // Restore scrolling
 }
+
+// SMART AUTO-FILL FOR AISLES
+function autoFillAisle(val) {
+  if (!val) return;
+  // Patterns like P-3-P171A860 or 171A860. 
+  // We look for a 3-digit number which usually represents the Aisle in FC locations.
+  // We exclude single digits like level '3' by requiring at least 2-3 digits.
+  const match = val.match(/\d{3}/);
+  if (match) {
+    const aisleInput = document.getElementById('aisle');
+    if (!aisleInput.value) { // Only auto-fill if currently empty
+      aisleInput.value = match[0];
+      toast('🤖 Aisle auto-detected: ' + match[0]);
+    }
+  }
+}
+
+// Add live listener for manual typing as well
+document.getElementById('bin_id').addEventListener('input', (e) => {
+  autoFillAisle(e.target.value);
+});
 </script>
 
 <!-- FULL SCREEN OVERLAY -->

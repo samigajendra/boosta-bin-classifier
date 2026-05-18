@@ -3,12 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>BOOSTA Bin Classifier | Amazon FC</title>
+<title>BOOSTA Bin Classifier | Analytics Charts Edition</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- Embed Chart.js library -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<!-- Embed html5-qrcode for barcode scanning -->
-<script src="https://unpkg.com/html5-qrcode"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -20,41 +18,6 @@
   --accent-glow: hsla(38, 100%, 50%, 0.15);
   --accent2: hsl(24, 100%, 50%);
   --u1: hsl(84, 81%, 44%);
-
-  /* Confidential Footer Styles */
-  .confidential-footer {
-    width: 100%;
-    padding: 2rem 1rem;
-    margin-top: 4rem;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    text-align: center;
-    color: hsl(222, 20%, 60%);
-    font-size: 0.85rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .confidential-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: hsla(0, 100%, 50%, 0.1);
-    color: hsl(0, 100%, 70%);
-    padding: 0.4rem 1rem;
-    border-radius: 20px;
-    border: 1px solid hsla(0, 100%, 50%, 0.2);
-    font-weight: 600;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .confidential-text {
-    max-width: 500px;
-    line-height: 1.5;
-    opacity: 0.8;
-  }
   --u2: hsl(38, 92%, 50%);
   --u3: hsl(0, 84%, 60%);
   --u4: hsl(0, 72%, 30%);
@@ -715,37 +678,6 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   color: var(--accent);
   transform: scale(1.2);
 }
-
-/* MOBILE RESPONSIVENESS */
-@media (max-width: 768px) {
-  nav { flex-direction: column; padding: 16px; gap: 16px; text-align: center; }
-  .nav-tabs { flex-wrap: wrap; justify-content: center; width: 100%; gap: 8px; }
-  .nav-tab { padding: 10px 12px; font-size: 0.85rem; flex: 1 1 40%; text-align: center; border-radius: 8px; }
-  
-  .row2 { grid-template-columns: 1fr; gap: 16px; }
-  
-  .form-card { padding: 20px; border-radius: 16px; box-shadow: none; border: none; background: transparent; }
-  .form-title { font-size: 1.5rem; text-align: center; margin-bottom: 24px; }
-  
-  /* Stack buttons like Take Photo and Choose File */
-  .form-group > div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
-  
-  .stats-bar, .aging-bar { flex-direction: column; width: 100%; }
-  
-  .dash-controls { flex-wrap: wrap; justify-content: center; }
-  .dash-controls select, .dash-controls input { width: 100%; min-width: unset !important; margin-bottom: 8px; }
-  .filter-btn { flex: 1 1 30%; text-align: center; padding: 10px; }
-  
-  .bins-grid, .heatmap-grid { grid-template-columns: 1fr; gap: 16px; }
-  
-  /* Make Resolved Card Before/After split stack vertically on small screens */
-  .bin-card > div[style*="display:flex; width: 100%;"] { flex-direction: column !important; }
-  .bin-card > div[style*="display:flex; width: 100%;"] > div { border-right: none !important; border-bottom: 2px solid var(--border) !important; }
-  .bin-card > div[style*="display:flex; width: 100%;"] > div:last-child { border-bottom: 2px solid var(--u1) !important; }
-  
-  /* Modal Adjustments */
-  #resolve-modal-overlay > div { padding: 20px !important; width: 95% !important; }
-}
 </style>
 </head>
 <body>
@@ -753,13 +685,12 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 <nav>
   <div class="logo">
     <span class="logo-badge">BOOSTA</span>
-    Bin Classifier
+    Bin Classifier <span style="font-size:0.75rem; color:var(--accent); font-weight:700; border:1px solid var(--accent); padding:2px 6px; border-radius:6px; margin-left:6px;">CHARTS</span>
   </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showView('submit')">📋 Report Bin</button>
     <button class="nav-tab" onclick="showView('dashboard')">📊 Dashboard</button>
     <button class="nav-tab" onclick="showView('heatmap')">🗺️ Heatmap</button>
-    <button class="nav-tab" onclick="showView('resolved')">✅ Resolved section</button>
   </div>
 </nav>
 
@@ -771,14 +702,7 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
     <div class="row2">
       <div class="form-group">
         <label>Bin ID (optional)</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="bin_id" placeholder="e.g. A-12-3" style="flex: 1;"/>
-          <button type="button" id="scan-btn" onclick="startScanner()" style="padding: 0 16px; border-radius: 12px; background: var(--surface); border: 2px solid var(--border); color: var(--text); cursor: pointer; font-weight: 700; transition: var(--transition);">📷 Scan</button>
-        </div>
-        <div id="reader-container" style="display: none; margin-top: 10px; border: 2px solid var(--border); border-radius: 12px; overflow: hidden; background: #000;">
-          <div id="reader" style="width: 100%;"></div>
-          <button type="button" onclick="stopScanner()" style="width: 100%; padding: 12px; background: var(--card); color: var(--u4); border: none; font-weight: bold; cursor: pointer; border-top: 1px solid var(--border);">Cancel Scan</button>
-        </div>
+        <input type="text" id="bin_id" placeholder="e.g. A-12-3"/>
       </div>
       <div class="form-group">
         <label>Aisle / Zone</label>
@@ -793,26 +717,13 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 
     <div class="form-group">
       <label>📷 Bin Photo</label>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-        <label class="btn-submit" style="margin-top:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding: 20px; text-transform:none; cursor:pointer;">
-          <span style="font-size: 1.5rem;">📸</span>
-          <span style="font-weight: 800;">Take Photo</span>
-          <input type="file" id="camera-input" accept="image/*" capture="environment" onchange="handleFile(this.files[0])" style="display:none;"/>
-        </label>
-        <label class="btn-submit" style="margin-top:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding: 20px; text-transform:none; background: var(--surface); color: var(--text); border: 2px solid var(--border); box-shadow: none; cursor:pointer;">
-          <span style="font-size: 1.5rem;">📁</span>
-          <span style="font-weight: 800;">Choose File</span>
-          <input type="file" id="image-input" accept="image/*" onchange="handleFile(this.files[0])" style="display:none;"/>
-        </label>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="image-input" accept="image/*" onchange="handleFile(this.files[0])"/>
+        <div class="drop-icon">📦</div>
+        <div class="drop-label">Click or drag photo here</div>
+        <div class="drop-sub">JPG, PNG, WEBP — max 16 MB</div>
       </div>
-      <div class="drop-zone" id="drop-zone" style="padding: 24px;">
-        <input type="file" accept="image/*" onchange="handleFile(this.files[0])" style="position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;"/>
-        <div class="drop-label">Or drag & drop photo here</div>
-        <div class="drop-sub">Click to browse files</div>
-      </div>
-      <div id="preview-wrap" style="margin-top: 16px; display: none;">
-        <img id="preview-img" style="width: 100%; border-radius: 12px; object-fit: cover; cursor: zoom-in;" src="" alt="preview" onclick="openFullScreen(this.src)"/>
-      </div>
+      <div id="preview-wrap"><img id="preview-img" src="" alt="preview" style="cursor: zoom-in;" onclick="openFullScreen(this.src)"/></div>
     </div>
 
     <div class="form-group">
@@ -850,12 +761,7 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
     </div>
 
     <div class="form-group">
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px;">
-        <label style="margin-bottom: 0;">📝 Description</label>
-        <button type="button" id="mic-btn" onclick="toggleDictation()" style="background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; transition: var(--transition);">
-          🎙️ Dictate
-        </button>
-      </div>
+      <label>📝 Description</label>
       <textarea id="description" rows="4" placeholder="Describe the bin condition in detail..."></textarea>
     </div>
 
@@ -869,7 +775,7 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
       </div>
     </div>
 
-    <button id="final-submit-btn" class="btn-submit" onclick="submitForm()">✅ Submit Bin Report</button>
+    <button class="btn-submit" onclick="submitForm()">✅ Submit Bin Report</button>
   </div>
 </div>
 
@@ -878,9 +784,6 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   <div class="stats-bar" id="stats-bar"></div>
   
   <div class="aging-bar" id="aging-bar"></div>
-  
-  <!-- BOOSTA COUNTS BAR -->
-  <div class="boosta-counts-bar" id="boosta-counts-bar" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; justify-content:center;"></div>
 
   <!-- INTERACTIVE CHARTS SECTION -->
   <div class="chart-card" style="max-width:680px; margin:0 auto 40px auto;">
@@ -919,14 +822,6 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
   <div class="bins-grid" id="bins-grid"></div>
 </div>
 
-<!-- RESOLVED SECTION VIEW -->
-<div class="view" id="view-resolved">
-  <div class="dash-controls" style="justify-content: center; margin-bottom: 20px;">
-    <span class="dash-title" style="color: var(--u1); font-size: 1.4rem;">✅ Resolved Issues Archive</span>
-  </div>
-  <div class="bins-grid" id="resolved-grid"></div>
-</div>
-
 <!-- HEATMAP VIEW -->
 <div class="view" id="view-heatmap">
   <div class="dash-controls" style="justify-content: center; margin-bottom: 20px;">
@@ -937,24 +832,11 @@ input[type=text]:focus, textarea:focus, .search-bar:focus {
 
 <div class="toast" id="toast"></div>
 
-<!-- RESOLVE MODAL OVERLAY -->
-<div id="resolve-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
-  <div style="background:var(--bg-card); padding:30px; border-radius:16px; width:90%; max-width:400px; text-align:center; border:1px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    <h3 style="color:#fff; margin-bottom:12px; font-size:1.3rem;">📸 Resolution Photo</h3>
-    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:24px;">Please provide a photo of the completed, neat bin to sign off on this resolution.</p>
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <button onclick="triggerResolveUpload(false)" style="background:var(--bg); color:#fff; border:1px solid var(--border); padding:16px; border-radius:12px; font-weight:bold; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
-        <span style="font-size:1.4rem;">📁</span> Upload a resolve image
-      </button>
-      <button onclick="triggerResolveUpload(true)" style="background:var(--u1); color:#fff; border:none; padding:16px; border-radius:12px; font-weight:bold; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
-        <span style="font-size:1.4rem;">📷</span> Click the resolved image
-      </button>
-      <button onclick="closeResolveModal()" style="background:transparent; color:var(--muted); border:none; padding:12px; border-radius:12px; font-weight:bold; cursor:pointer; margin-top:8px;">Cancel</button>
-    </div>
-  </div>
-</div>
-
 <script>
+// Configure Global Chart.js Themes for Dark Mode aesthetics
+Chart.defaults.color = 'hsl(215, 25%, 75%)';
+Chart.defaults.borderColor = 'hsl(222, 30%, 20%)';
+
 const BOOSTA_LABELS = {B:'Blocking',O1:'Over-stuffing',O2:'Overhanging',S:'Same/Similar',T:'Type of Bin',A:'Above divider',OTHERS:'Others'};
 const MANAGER_PIN = "8888"; // Pin for resolving
 const DELETE_PIN = "9999"; // Pin for deleting
@@ -968,128 +850,8 @@ let currentBinsData = []; // Store fetched bins for local searching
 
 let boostaChartInstance = null;
 
-// Configure Global Chart.js Themes for Dark Mode aesthetics
-if (typeof Chart !== 'undefined') {
-  Chart.defaults.color = 'hsl(215, 25%, 75%)';
-  Chart.defaults.borderColor = 'hsl(222, 30%, 20%)';
-}
-
 // Init
 setUrgency(1);
-
-// Barcode Scanner
-let html5QrcodeScanner = null;
-
-function startScanner() {
-  document.getElementById('reader-container').style.display = 'block';
-  if (!html5QrcodeScanner) {
-    html5QrcodeScanner = new Html5Qrcode("reader");
-  }
-  const config = { fps: 10, qrbox: { width: 250, height: 150 } };
-  html5QrcodeScanner.start(
-    { facingMode: "environment" },
-    config,
-    (decodedText, decodedResult) => {
-      // success
-      document.getElementById('bin_id').value = decodedText;
-      autoFillAisle(decodedText);
-      stopScanner();
-      toast('✅ Barcode scanned successfully!');
-    },
-    (errorMessage) => {
-      // parse error, ignore
-    }
-  ).catch((err) => {
-    console.error(err);
-    toast('❌ Camera access denied or error starting scanner.');
-    stopScanner();
-  });
-}
-
-function stopScanner() {
-  if (html5QrcodeScanner) {
-    html5QrcodeScanner.stop().then((ignore) => {
-      document.getElementById('reader-container').style.display = 'none';
-    }).catch((err) => {
-      console.error(err);
-      document.getElementById('reader-container').style.display = 'none';
-    });
-  } else {
-    document.getElementById('reader-container').style.display = 'none';
-  }
-}
-
-// Voice to Text Dictation
-let recognition;
-let isDictating = false;
-
-function toggleDictation() {
-  const micBtn = document.getElementById('mic-btn');
-  const desc = document.getElementById('description');
-
-  if (isDictating) {
-    if (recognition) recognition.stop();
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    toast('❌ Voice dictation is not supported in this browser.');
-    return;
-  }
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
-
-  recognition.onstart = () => {
-    isDictating = true;
-    micBtn.innerHTML = '🔴 Listening...';
-    micBtn.style.borderColor = 'var(--u3)';
-    micBtn.style.color = 'var(--u3)';
-  };
-
-  recognition.onresult = (event) => {
-    let finalTranscript = '';
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        finalTranscript += event.results[i][0].transcript;
-      }
-    }
-    
-    // Append the final transcript to the textarea
-    if (finalTranscript) {
-      const currentVal = desc.value;
-      desc.value = currentVal ? currentVal + ' ' + finalTranscript.trim() : finalTranscript.trim();
-    }
-  };
-
-  recognition.onerror = (event) => {
-    console.error('Speech recognition error', event.error);
-    if (event.error !== 'no-speech') {
-      toast('❌ Dictation error: ' + event.error);
-    }
-    stopDictationUI();
-  };
-
-  recognition.onend = () => {
-    stopDictationUI();
-  };
-
-  recognition.start();
-}
-
-function stopDictationUI() {
-  isDictating = false;
-  const micBtn = document.getElementById('mic-btn');
-  if(micBtn) {
-    micBtn.innerHTML = '🎙️ Dictate';
-    micBtn.style.borderColor = 'var(--border)';
-    micBtn.style.color = 'var(--text)';
-  }
-}
 
 // Drag & Drop
 const dz = document.getElementById('drop-zone');
@@ -1102,17 +864,13 @@ function handleFile(file) {
   const reader = new FileReader();
   
   reader.onload = e => {
-    // 1. Create a new image object in memory
     const img = new Image();
-    
     img.onload = () => {
-      // 2. Create a canvas to draw and resize the image
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      const MAX_DIMENSION = 1000; // Shrink to max 1000px
+      const MAX_DIMENSION = 1000;
 
-      // 3. Calculate new proportions if the image is too large
       if (width > height && width > MAX_DIMENSION) {
         height *= MAX_DIMENSION / width;
         width = MAX_DIMENSION;
@@ -1121,26 +879,20 @@ function handleFile(file) {
         height = MAX_DIMENSION;
       }
 
-      // 4. Draw the image onto the smaller canvas
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      // 5. Convert canvas back to a compressed JPEG file (70% quality)
       canvas.toBlob(blob => {
-        compressedImageBlob = blob; // Save it to be sent to the server
-        
-        // Show the compressed image in the preview box
+        compressedImageBlob = blob;
         const compressedUrl = URL.createObjectURL(blob);
         document.getElementById('preview-img').src = compressedUrl;
         document.getElementById('preview-wrap').style.display = 'block';
       }, 'image/jpeg', 0.7);
     };
-    
     img.src = e.target.result;
   };
-  
   reader.readAsDataURL(file);
 }
 
@@ -1159,18 +911,28 @@ function toggleBoosta(cb) {
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  const targetView = document.getElementById('view-' + name);
-  if (targetView) targetView.classList.add('active');
+  document.getElementById('view-' + name).classList.add('active');
   
-  const tabs = document.querySelectorAll('.nav-tab');
-  if (tabs.length >= 4) {
+  try {
+    if (typeof event !== 'undefined' && event && event.currentTarget) {
+      event.currentTarget.classList.add('active');
+    } else {
+      const tabs = document.querySelectorAll('.nav-tab');
+      if (name === 'submit') tabs[0].classList.add('active');
+      if (name === 'dashboard') tabs[1].classList.add('active');
+      if (name === 'heatmap' && tabs[2]) tabs[2].classList.add('active');
+    }
+  } catch(e) {
+    const tabs = document.querySelectorAll('.nav-tab');
     if (name === 'submit') tabs[0].classList.add('active');
     if (name === 'dashboard') tabs[1].classList.add('active');
-    if (name === 'heatmap') tabs[2].classList.add('active');
-    if (name === 'resolved') tabs[3].classList.add('active');
+    if (name === 'heatmap' && tabs[2]) tabs[2].classList.add('active');
   }
-
-  if (name === 'dashboard' || name === 'resolved' || name === 'heatmap') { loadStats(); loadBins(); }
+  
+  if (name === 'dashboard' || name === 'heatmap') { 
+    loadStats(); 
+    loadBins(); 
+  }
 }
 
 function toast(msg, dur=3000) {
@@ -1187,7 +949,6 @@ async function submitForm() {
   fd.append('reported_by', document.getElementById('reported_by').value.trim());
   const description = document.getElementById('description').value.trim();
   
-  // Validation for OTHERS
   if (selectedBoosta.includes('OTHERS') && !description) {
     toast('⚠️ Please provide a description for the "OTHERS" violation.');
     return;
@@ -1197,24 +958,19 @@ async function submitForm() {
   fd.append('urgency', selectedUrgency);
   fd.append('boosta_categories', JSON.stringify(selectedBoosta));
   
-  // Attach the compressed image instead of the huge original file
   if (compressedImageBlob) {
     fd.append('image', compressedImageBlob, 'photo.jpg');
   }
 
-  const btn = document.getElementById('final-submit-btn');
-  if (btn) {
-    btn.textContent = '⏳ Submitting...';
-    btn.disabled = true;
-  }
+  const btn = document.querySelector('.btn-submit');
+  btn.textContent = '⏳ Submitting...';
+  btn.disabled = true;
 
   try {
     if (window.location.protocol === 'file:') {
       toast('⚠️ Error: You are opening this as a file. Please use http://localhost:5000');
-      if (btn) {
-        btn.textContent = '✅ Submit Bin Report';
-        btn.disabled = false;
-      }
+      btn.textContent = '✅ Submit Bin Report';
+      btn.disabled = false;
       return;
     }
 
@@ -1232,10 +988,8 @@ async function submitForm() {
     console.error('Submission error:', e);
     toast('❌ Server error. Is the server running at ' + window.location.origin + '?');
   } finally {
-    if (btn) {
-      btn.textContent = '✅ Submit Bin Report';
-      btn.disabled = false;
-    }
+    btn.textContent = '✅ Submit Bin Report';
+    btn.disabled = false;
   }
 }
 
@@ -1245,9 +999,8 @@ function resetForm() {
   document.getElementById('reported_by').value = '';
   document.getElementById('description').value = '';
   document.getElementById('image-input').value = '';
-  if (document.getElementById('camera-input')) document.getElementById('camera-input').value = '';
   document.getElementById('preview-wrap').style.display = 'none';
-  compressedImageBlob = null; // Clear the compressed photo from memory
+  compressedImageBlob = null;
   document.querySelectorAll('.boosta-grid input').forEach(cb => { cb.checked = false; });
   selectedBoosta = [];
   setUrgency(1);
@@ -1292,11 +1045,11 @@ async function loadBins(urgency='') {
     if (urgency === 'open') bins = bins.filter(b => b.status === 'open');
     if (urgency === 'resolved') bins = bins.filter(b => b.status === 'resolved');
     
-    currentBinsData = bins; // Store for local search
+    currentBinsData = bins;
     renderBins();
-    renderResolvedBins();
     renderHeatmap();
-  } catch(e) { 
+  } catch(e) {
+ 
     console.error('Bins load error:', e);
     grid.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div>Could not load data. Is the server running?</div></div>'; 
   }
@@ -1363,23 +1116,6 @@ function renderCharts(filteredBins) {
         }
       });
     }
-
-    // UPDATE VISUAL BOOSTA BADGES
-    const boostaBar = document.getElementById('boosta-counts-bar');
-    if (boostaBar) {
-        const badgHtml = [];
-        const bStyle = "padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5);";
-        if (boostaCounts.B > 0) badgHtml.push(`<div style="${bStyle} background-color: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.4);">Blocking (B): ${boostaCounts.B}</div>`);
-        if (boostaCounts.O1 > 0) badgHtml.push(`<div style="${bStyle} background-color: #ec4899; box-shadow: 0 0 10px rgba(236,72,153,0.4);">Over-stuffing (O1): ${boostaCounts.O1}</div>`);
-        if (boostaCounts.O2 > 0) badgHtml.push(`<div style="${bStyle} background-color: #f43f5e; box-shadow: 0 0 10px rgba(244,63,94,0.4);">Overhanging (O2): ${boostaCounts.O2}</div>`);
-        if (boostaCounts.S > 0) badgHtml.push(`<div style="${bStyle} background-color: #3b82f6; box-shadow: 0 0 10px rgba(59,130,246,0.4);">Same/Similar (S): ${boostaCounts.S}</div>`);
-        if (boostaCounts.T > 0) badgHtml.push(`<div style="${bStyle} background-color: #10b981; box-shadow: 0 0 10px rgba(16,185,129,0.4);">Type of Bin (T): ${boostaCounts.T}</div>`);
-        if (boostaCounts.A > 0) badgHtml.push(`<div style="${bStyle} background-color: #8b5cf6; box-shadow: 0 0 10px rgba(139,92,246,0.4);">Above divider (A): ${boostaCounts.A}</div>`);
-        if (boostaCounts.OTHERS > 0) badgHtml.push(`<div style="${bStyle} background-color: #6b7280; box-shadow: 0 0 10px rgba(107,114,128,0.4);">OTHERS: ${boostaCounts.OTHERS}</div>`);
-        
-        boostaBar.innerHTML = badgHtml.join('');
-    }
-
   } catch(e) {
     console.error("Chart Rendering Error:", e);
   }
@@ -1391,7 +1127,7 @@ function renderBins() {
   const sortOrder = document.getElementById('sort-order').value;
   const boostaCat = document.getElementById('boosta-filter') ? document.getElementById('boosta-filter').value : 'all';
   
-  let filtered = [...currentBinsData]; // Use spread to avoid mutating original data
+  let filtered = [...currentBinsData];
 
   // 1. Search Filter
   if (term) {
@@ -1426,7 +1162,7 @@ function renderBins() {
     return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
   });
 
-  // 3. Aging Summary Calculation (Only for Open issues)
+  // 3. Aging Summary Calculation
   const now = Date.now();
   const aging = { h0: 0, h3: 0, h6: 0, h12: 0, h24: 0 };
   
@@ -1489,77 +1225,16 @@ function binCard(b) {
       </div>
       <div class="bin-desc">${b.description||'No description'}</div>
       ${tags?`<div class="boosta-tags">${tags}</div>`:''}
-      <div class="bin-meta" style="flex-direction: column; gap: 4px;">
-        <div style="display:flex; justify-content:space-between;">
-          <span>👤 ${b.reported_by||'Unknown'}</span>
-          <span>🕐 ${ts}</span>
-        </div>
-        ${resolved && b.resolved_by ? `<div style="color:var(--u1); font-weight:700;">✅ Resolved by: ${b.resolved_by}</div>` : ''}
+      <div class="bin-meta">
+        <span>👤 ${b.reported_by||'Unknown'}</span>
+        <span>🕐 ${ts}</span>
       </div>
       <div class="bin-actions">
-        <button class="btn-sm btn-resolve" onclick="resolveRecord('${b.id}', '${b.status}')">${resolved?'🔓 Reopen':'✅ Resolve'}</button>
+        <button class="btn-sm btn-resolve" onclick="resolveRecord('${b.id}')">${resolved?'🔓 Reopen':'✅ Resolve'}</button>
         <button class="btn-sm btn-delete" onclick="deleteRecord('${b.id}')">🗑️ Delete</button>
       </div>
     </div>
   </div>`;
-}
-
-function formatExactTime(ts) {
-  if (!ts) return 'N/A';
-  let d = ts;
-  if (!d.endsWith('Z') && !d.includes('+')) d = d + 'Z';
-  const date = new Date(d);
-  return date.toLocaleString();
-}
-
-function resolvedCard(b) {
-  const imgHtmlBefore = b.image_url
-    ? `<div class="bin-img" onclick="openFullScreen('${b.image_url}')" style="height:120px; cursor: zoom-in;"><img src="${b.image_url}" alt="before"/></div>`
-    : `<div class="bin-img" style="height:120px;font-size:2rem">📦</div>`;
-    
-  const imgHtmlAfter = b.resolved_image_url
-    ? `<div class="bin-img" onclick="openFullScreen('${b.resolved_image_url}')" style="height:120px; cursor: zoom-in;"><img src="${b.resolved_image_url}" alt="after"/></div>`
-    : `<div class="bin-img" style="height:120px;font-size:2rem;">✨</div>`;
-
-  const raisedTime = formatExactTime(b.timestamp);
-  const resolvedTime = formatExactTime(b.resolved_at || b.timestamp);
-  
-  return `<div class="bin-card" style="border-color: var(--u1);">
-    <div style="display:flex; width: 100%;">
-      <div style="flex: 1; border-right: 1px solid var(--border); position: relative;">
-        <div style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; z-index: 2;">Before</div>
-        ${imgHtmlBefore}
-      </div>
-      <div style="flex: 1; position: relative; border-bottom: 2px solid var(--u1);">
-        <div style="position: absolute; top: 8px; left: 8px; background: rgba(34,197,94,0.9); font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; z-index: 2;">After</div>
-        ${imgHtmlAfter}
-      </div>
-    </div>
-    <div class="bin-body" style="padding: 20px;">
-      <div style="font-weight: 800; font-size: 1.1rem; color: #fff; margin-bottom: 12px;">${b.bin_id||'(No ID)'} ${b.aisle?'· '+b.aisle:''}</div>
-      <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 8px;">
-        <div><b>Reported By:</b> ${b.reported_by || 'Unknown'}</div>
-        <div style="color: var(--u1); margin-top: 4px;"><b>Resolved By:</b> ${b.resolved_by || 'Manager'}</div>
-      </div>
-      <div style="font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px;">
-        <div><b>Raised:</b> ${raisedTime}</div>
-        <div style="margin-top: 2px;"><b>Resolved:</b> ${resolvedTime}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function renderResolvedBins() {
-  const grid = document.getElementById('resolved-grid');
-  if (!grid) return;
-  const resolvedBins = currentBinsData.filter(b => b.status === 'resolved');
-  
-  if (!resolvedBins.length) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><div>No resolved issues yet</div></div>';
-    return;
-  }
-  
-  grid.innerHTML = resolvedBins.map(b => resolvedCard(b)).join('');
 }
 
 function filterDash(val, btn) {
@@ -1569,127 +1244,19 @@ function filterDash(val, btn) {
   loadBins(val);
 }
 
-async function resolveRecord(id, currentStatus) {
+async function resolveRecord(id) {
   const pin = prompt('🔐 Manager Authorization Required\nPlease enter PIN to resolve/reopen this issue:');
-  if (pin === null) return; // User clicked Cancel
+  if (pin === null) return;
   
   if (pin !== MANAGER_PIN) {
     toast('❌ Invalid PIN. Access denied.');
     return;
   }
 
-  if (currentStatus === 'open') {
-    const resolvedBy = prompt('👤 Please enter your Name or Login ID to sign off on this resolution:');
-    if (!resolvedBy || !resolvedBy.trim()) {
-      toast('❌ Name/Login ID is required to resolve.');
-      return;
-    }
-    
-    // Save state and show modal
-    pendingResolveId = id;
-    pendingResolveName = resolvedBy.trim();
-    document.getElementById('resolve-modal-overlay').style.display = 'flex';
-
-  } else {
-    // Reopening
-    await fetch('/api/bins/' + id + '/resolve', { 
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resolved_by: '' })
-    });
-    
-    toast('✅ Status updated to Open');
-    loadBins(currentFilter);
-    loadStats();
-    renderHeatmap();
-  }
-}
-
-let pendingResolveId = null;
-let pendingResolveName = null;
-
-function closeResolveModal() {
-  document.getElementById('resolve-modal-overlay').style.display = 'none';
-  pendingResolveId = null;
-  pendingResolveName = null;
-}
-
-function triggerResolveUpload(useCamera) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  if (useCamera) {
-    input.capture = 'environment';
-  }
-  input.style.display = 'none';
-  document.body.appendChild(input);
-  
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    document.body.removeChild(input);
-    
-    const resolveId = pendingResolveId;
-    const resolveName = pendingResolveName;
-    closeResolveModal();
-    
-    if (!file) { toast('❌ Resolved bin photo is required.'); return; }
-    
-    toast('⏳ Compressing photo for faster upload...');
-    
-    const reader = new FileReader();
-    reader.onload = event => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const MAX_DIMENSION = 1000;
-        
-        if (width > height && width > MAX_DIMENSION) {
-          height *= MAX_DIMENSION / width;
-          width = MAX_DIMENSION;
-        } else if (height > MAX_DIMENSION) {
-          width *= MAX_DIMENSION / height;
-          height = MAX_DIMENSION;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob(async blob => {
-          const fd = new FormData();
-          fd.append('resolved_by', resolveName);
-          fd.append('image', blob, 'resolved.jpg');
-          
-          toast('⏳ Uploading image and updating status...');
-          try {
-            const res = await fetch('/api/bins/' + resolveId + '/resolve', { 
-              method: 'POST',
-              body: fd
-            });
-            const data = await res.json();
-            if (data.success) {
-              toast('✅ Status updated to Resolved!');
-              loadBins(currentFilter);
-              loadStats();
-              renderHeatmap();
-            } else {
-              toast('❌ Error: ' + (data.error || 'Unknown error'));
-            }
-          } catch (err) {
-            toast('❌ Upload failed: ' + err.message);
-            console.error(err);
-          }
-        }, 'image/jpeg', 0.7); // Compress to 70% quality JPEG
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-  
-  input.click();
+  await fetch('/api/bins/' + id + '/resolve', { method: 'PATCH' });
+  toast('✅ Status updated');
+  loadBins(currentFilter);
+  loadStats();
 }
 
 async function deleteRecord(id) {
@@ -1776,13 +1343,10 @@ function closeFullScreen() {
 // SMART AUTO-FILL FOR AISLES
 function autoFillAisle(val) {
   if (!val) return;
-  // Patterns like P-3-P171A860 or 171A860. 
-  // We look for a 3-digit number which usually represents the Aisle in FC locations.
-  // We exclude single digits like level '3' by requiring at least 2-3 digits.
   const match = val.match(/\d{3}/);
   if (match) {
     const aisleInput = document.getElementById('aisle');
-    if (!aisleInput.value) { // Only auto-fill if currently empty
+    if (!aisleInput.value) {
       aisleInput.value = match[0];
       toast('🤖 Aisle auto-detected: ' + match[0]);
     }
@@ -1800,23 +1364,6 @@ document.getElementById('bin_id').addEventListener('input', (e) => {
   <span class="close-overlay">&times;</span>
   <img id="overlay-img" src="" alt="Full Screen Preview">
 </div>
-
-<!-- OFFICIAL CONFIDENTIAL FOOTER -->
-<footer class="confidential-footer">
-  <div class="confidential-badge">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-    Internal Use Only
-  </div>
-  <div class="confidential-text">
-    <strong>CONFIDENTIAL - AMAZON FC PROTOTYPE</strong><br>
-    This is an internal prototype tool developed for BOOSTA Bin Classification. 
-    Access is restricted to authorized Amazon fulfillment associates only. 
-    Unauthorized distribution or access is prohibited.
-  </div>
-  <div style="margin-top: 0.5rem; opacity: 0.4; font-size: 0.7rem;">
-    Powered by BOOSTA AWS Cloud v2.0
-  </div>
-</footer>
 
 </body>
 </html>
